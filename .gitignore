@@ -37,3 +37,13 @@ package-lock.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Allow these files
+!data/processed/telco_churn_clean.csv
+!data/raw/telco_churn.csv
+!models/*.pkl
+!models/*.joblib
+
+# Ignore node_modules but allow dist
+node_modules/
+frontend/dist/

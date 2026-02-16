@@ -3,7 +3,10 @@ import axios from 'axios'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
 import { Users, TrendingUp, AlertCircle, DollarSign, Activity, Upload, Download, Brain } from 'lucide-react'
 
-const API_URL = 'http://localhost:8000'
+import API_BASE_URL from './config'
+
+const API_URL = API_BASE_URL
+
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard')

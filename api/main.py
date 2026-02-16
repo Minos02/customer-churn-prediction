@@ -1,94 +1,63 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from typing import Literal
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
+import os
 import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Add src to path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+
 from src.predict import predict_churn
-import sqlite3
 import pandas as pd
-from flask import send_from_directory
-import os
+import sqlite3
 
-app = FastAPI(
-    title="Churn Prediction API",
-    description="ML-powered customer churn prediction system",
-    version="1.0.0"
-)
+app = Flask(__name__, static_folder='../frontend/dist', static_url_path='')
+CORS(app)
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-class CustomerInput(BaseModel):
-    gender: Literal['Male', 'Female']
-    SeniorCitizen: Literal['Yes', 'No']
-    Partner: Literal['Yes', 'No']
-    Dependents: Literal['Yes', 'No']
-    tenure: int = Field(ge=0, le=100)
-    PhoneService: Literal['Yes', 'No']
-    MultipleLines: Literal['Yes', 'No', 'No phone service']
-    InternetService: Literal['DSL', 'Fiber optic', 'No']
-    OnlineSecurity: Literal['Yes', 'No', 'No internet service']
-    OnlineBackup: Literal['Yes', 'No', 'No internet service']
-    DeviceProtection: Literal['Yes', 'No', 'No internet service']
-    TechSupport: Literal['Yes', 'No', 'No internet service']
-    StreamingTV: Literal['Yes', 'No', 'No internet service']
-    StreamingMovies: Literal['Yes', 'No', 'No internet service']
-    Contract: Literal['Month-to-month', 'One year', 'Two year']
-    PaperlessBilling: Literal['Yes', 'No']
-    PaymentMethod: Literal['Electronic check', 'Mailed check', 'Bank transfer (automatic)', 'Credit card (automatic)']
-    MonthlyCharges: float = Field(gt=0)
-    TotalCharges: float = Field(ge=0)
-
-class PredictionResponse(BaseModel):
-    churn_probability: float
-    churn_prediction: int
-    risk_level: str
-
-@app.get("/")
-def root():
-    return {"message": "Churn Prediction API", "status": "active"}
-
-@app.get("/health")
-def health_check():
-    return {"status": "healthy", "model": "loaded"}
-
-@app.post("/predict", response_model=PredictionResponse)
-def predict(customer: CustomerInput):
-    """Predict churn for a customer"""
+# Load data for KPIs
+def load_data():
     try:
-        customer_dict = customer.dict()
-        result = predict_churn(customer_dict)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        df = pd.read_csv('data/processed/telco_churn_clean.csv')
+    except:
+        df = pd.read_csv('data/raw/telco_churn.csv')
+        df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce')
+        df['TotalCharges'].fillna(0, inplace=True)
+        df['Churn'] = df['Churn'].map({'Yes': 1, 'No': 0})
+    return df
 
-@app.get("/kpis")
+@app.route('/api/health')
+def health():
+    return jsonify({"status": "healthy", "message": "API is running"})
+
+@app.route('/api/kpis')
 def get_kpis():
-    """Get business KPIs from database"""
     try:
-        conn = sqlite3.connect('data/churn.db')
-        kpi = pd.read_sql_query("SELECT * FROM kpi_summary", conn)
-        conn.close()
-        return kpi.to_dict(orient='records')[0]
+        df = load_data()
+        return jsonify({
+            'total_customers': int(len(df)),
+            'churned_customers': int(df['Churn'].sum()),
+            'churn_rate': float(df['Churn'].mean() * 100),
+            'avg_monthly_charges': float(df['MonthlyCharges'].mean())
+        })
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/predict', methods=['POST'])
+def predict():
+    try:
+        data = request.get_json()
+        result = predict_churn(data)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Serve React App
 @app.route('/', defaults={'path': ''})
 @app.route('/<path:path>')
-def serve_react(path):
-    if path != "" and os.path.exists(os.path.join('../frontend/build', path)):
-        return send_from_directory('../frontend/build', path)
+def serve(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, path)):
+        return send_from_directory(app.static_folder, path)
     else:
-        return send_from_directory('../frontend/build', 'index.html')
-
+        return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
