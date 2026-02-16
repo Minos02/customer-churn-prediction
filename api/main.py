@@ -8,6 +8,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from src.predict import predict_churn
 import sqlite3
 import pandas as pd
+from flask import send_from_directory
+import os
 
 app = FastAPI(
     title="Churn Prediction API",
@@ -78,7 +80,16 @@ def get_kpis():
         return kpi.to_dict(orient='records')[0]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_react(path):
+    if path != "" and os.path.exists(os.path.join('../frontend/build', path)):
+        return send_from_directory('../frontend/build', path)
+    else:
+        return send_from_directory('../frontend/build', 'index.html')
+
 
 if __name__ == '__main__':
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
