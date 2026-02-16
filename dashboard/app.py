@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import sqlite3
 import requests
 import io
 
@@ -28,7 +27,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # API endpoint
-API_URL = "http://localhost:8000"
+API_URL = "https://customerchurnai.streamlit.app/"  # Change when you deploy API
+# For now, predictions won't work without deployed API
+
 
 st.markdown('<h1 class="main-header">📊 Customer Churn Prediction System</h1>', unsafe_allow_html=True)
 st.markdown("**AI-Powered Customer Retention Platform** | Built with ML, FastAPI & Streamlit")
@@ -40,10 +41,18 @@ page = st.sidebar.selectbox("", ["📈 Analytics", "🔮 Single Prediction", "�
 # Load data from SQL
 @st.cache_data
 def load_data():
-    conn = sqlite3.connect('data/churn.db')
-    df = pd.read_sql_query("SELECT * FROM customers", conn)
-    conn.close()
-    return df
+    # Load from CSV instead of SQLite for cloud deployment
+    try:
+        df = pd.read_csv('data/processed/telco_churn_clean.csv')
+        return df
+    except:
+        # Fallback: use raw data
+        df = pd.read_csv('data/raw/telco_churn.csv')
+        # Basic cleaning
+        df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce')
+        df['TotalCharges'].fillna(0, inplace=True)
+        df['Churn'] = df['Churn'].map({'Yes': 1, 'No': 0})
+        return df
 
 df = load_data()
 

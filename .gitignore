@@ -11,7 +11,9 @@ dist/
 build/
 
 # Data & Models
-*.csv
+data/raw/WA_Fn*.csv
+data/raw/archive.zip
+
 *.db
 *.pkl
 mlruns/
