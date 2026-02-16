@@ -3,9 +3,10 @@ numpy
 scikit-learn
 fastapi
 uvicorn[standard]
-streamlit
+streamlit==1.31.0
 plotly
 mlflow
 evidently
 python-multipart
 joblib
+altair<5
